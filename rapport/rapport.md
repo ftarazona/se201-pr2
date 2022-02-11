@@ -98,7 +98,8 @@ Déassemblage de la section .text :
 
 ```
 
-Le symbole `_start` correspond au code qui viendrait habituellement d'un fichier `crtX.s`. Le code de la première boucle du programme commence à l'adresse `0x1013c` et fini en `0x10154` :
+Le symbole `_start` correspond au code qui viendrait habituellement d'un fichier `crtX.s`. Le code de la première boucle du programme commence 
+à l'adresse `0x1013c` et fini en `0x10154` :
 
 ```
 
@@ -139,16 +140,18 @@ Le symbole `input` est à l'adresse `0x000111e8`. Il est utilisé par l'instruct
 
 Du code qualifié de _Position Independent_ est un morceau de code s'exécutant correctement indépendamment de son placement dans la mémoire. Le PIC est utile lors 
 d'utilisation partagée d'un même extrait de code (par exemple des fonctions de librairies communes à deux programmes) puisqu'il permet de ne pas se soucier des 
-emplacements des programmes respectifs. L'absence d'utilisation d'adresses absolues rend plus difficile la modification de la mémoire puisque l'attaquant ne connait 
+emplacements des programmes respectifs. En ce qui concerne la sécurité, l'absence d'utilisation d'adresses absolues rend plus difficile la modification de la mémoire puisque l'attaquant ne connait 
 pas l'adresse exacte où il doit réaliser l'injection de code / l'écriture mémoire.\
 L'instruction `auipc` permet d'ajouter au `pc` un immédiat codé sur 20bits. En particulier, elle permet d'effectuer un saut sur n'importe quelle adresse de 32 bits 
 lorsqu'elle est associée à l'instruction `jalr`. Cette combinaison permet, en pratique, d'accéder à toutes adresses écrites sur 32 bits à partir d'adresses relatives 
 et non absolues.
 
 Le code assembleur obtenu n'est pas _position independent_, il fait appel à des instructions utilisant des adresses absolues au lieu d'adresses relatives.
-???? le dump indique des adresses absolues dans tous les cas, en particulier à la ligne `0x10178`, alors que les instructions utilisent des offsets. Traduction de objdump?
+Le dump indique des adresses absolues dans tous les cas, en particulier à la ligne `0x10178`, alors que les instructions utilisent des offsets. Le dump n'est 
+cependant pas clairs sur les formats des immédiats qu'il fourni, nous l'avons donc peut-être mal interprété.
 Dans le cas où c'est bien les adresses absolues qui sont utilisées, ce code n'est pas _position independent_.\
-Dans tous les cas, l'utilisation de `ret` à la fin de la fonction `minIndex` se traduit par l'instruction `jalr x0, x1, 0` et l'adresse dans `x1` n'est aps une adresse relative à la position actuelle (c'est l'adresse de retour enregistrée par l'instruction d'adresse `0x10178`).
+Dans tous les cas, l'utilisation de `ret` à la fin de la fonction `minIndex` se traduit par l'instruction `jalr x0, x1, 0` et l'adresse dans `x1` n'est pas une 
+adresse relative à la position actuelle (c'est l'adresse de retour enregistrée par l'instruction d'adresse `0x10178`).
 
 
 
@@ -157,9 +160,9 @@ Dans tous les cas, l'utilisation de `ret` à la fin de la fonction `minIndex` se
 La table des symboles donnée par `objdump` indique que `input` se situe dans la section `.data` à l'adresse `0x111c8`.
 On retrouve cet emplacement dans l'onglet Memory de Ripes :
 
-![mem_input](img/mem_input.png)
+![mem_input](img/mem_input.png)\
 
-Le transfert de `input` dans `buffer` (qui se situe dans la stack) se fait au début de main :
+Le transfert de `input` dans `buffer` (qui se situe dans la stack) se fait au début de `main` :
 
 ```
    10130:   0007a683             lw a3,0(a5)
@@ -169,33 +172,36 @@ Le transfert de `input` dans `buffer` (qui se situe dans la stack) se fait au d�
    10140:   fec798e3             bne   a5,a2,10130 <main+0x2c>
 ```
 
-L'instruction `lw` charge la valeur depuis la mémoire pour que `sw` la restocke dans la stack. On peut donc déterminer l'emplacement de la stack (et vérifier l'emplacement de `input`) en regardant les valeurs des registres `a4` et `a5` lors de la première itération.
-![a4_a5](img/reg_a4_a5.png)
-![mem_buffer](img/mem_stack.png)
-L'alogrithme cherche de manière linéaire la plus petite valeur de la liste et l'échange avec l'indice courant. Lors de la première itération on s'attend alors à ce que la valeur `60` à l'adresse `0x7ffffe34` soit échangée avec le `0` à l'adresse `0x7fffed0`.
+L'instruction `lw` charge la valeur depuis la mémoire pour que `sw` la restocke dans la stack. On peut donc déterminer l'emplacement de la stack (et vérifier 
+l'emplacement de `input`) en regardant les valeurs des registres `a4` et `a5` lors de la première itération.
 
-![e34](img/7ffffe34.png)
-![ed0](img/7ffffed0.png)
+![a4_a5](img/reg_a4_a5.png)\
+![mem_buffer](img/mem_stack.png)\
+
+L'alogrithme cherche de manière linéaire la plus petite valeur de la liste et l'échange avec l'indice courant. Lors de la première itération on s'attend alors 
+à ce que la valeur `60` à l'adresse `0x7ffffe34` soit échangée avec le `0` à l'adresse `0x7fffed0`.
+
+![e34](img/7ffffe34.png)\
+![ed0](img/7ffffed0.png)\
 
 On peut vérifier à la sortie du programme.
 
-![sorted](img/sorted.png)
+![sorted](img/sorted.png)\
 
-C'est d'une beauté sublime et nous pouvons nous dire que c'est mignon de voir des cases bouger en mémoire. Pour la gestion du cache, les essais seront réalisés à la partie 5 du projet.
+C'est d'une beauté sublime et nous pouvons nous dire que c'est mignon de voir des cases bouger en mémoire. Pour la gestion du cache, les essais seront réalisés 
+dans la partie 5 du projet.
 
+Enfin nous comparons les caractéristiques d'exécution d'un processeur RISC-V à 5 étages de pipelines et d'un processeur à double pipeline à 6 étages. Dans les 
+deux cas, la plupart des cycles sont dédiés aux instructions de la boucle du programme appelant la fonction `minIndex`. Voici les caractéristiques exactes :
 
-Enfin nous comparons les caractéristiques d'exécution d'un processeur RISC-V à 5 étages de pipelines et d'un processeur à double pipeline à 6 étages.
+| Caractéristiques | Processeur à 5 étages | Processeur à 6 étages |
+|------------------|-----------------------|-----------------------|
+| Nombre total de cycles | 58998 | 53943 |
+| CPI | 1,38  | 1,26  |
+| IPC | 0,725 | 0,793 |
 
-
-**Caractéristiques d'exécution 5-stage pipeline**: Le programme prend 58998 cycles à s'exécuter. 
-La plupart de ces cycles sont dédiés aux instructions de la boucle du programme 
-appelant la fonction `minIndex`. On a un CPI de 1,38 et un IPC de 0,725
-
-**Caractéristiques d'exécution 6-stage dual-issue**: Le programme prend 53943 cycles à s'exécuter. 
-La plupart de ces cycles sont dédiés aux instructions de la boucle du programme 
-appelant la fonction `minIndex`. On a un CPI de 1,26 et un IPC de 0,793
-
-Remarquons qu'exécuter deux instructions simultanément offre une accélération un peu décevante. En effet le tri par insertion n'est pas adapté à la parallélisation : chaque étape dépend de la précédente et la recherche du minimum n'est également pas parallélisée...
+Remarquons qu'exécuter deux instructions simultanément offre une accélération un peu décevante. En effet le tri par insertion n'est pas adapté à la parallélisation : 
+chaque étape dépend de la précédente et la recherche du minimum n'est également pas parallélisée...
 
 
 \newpage
@@ -208,8 +214,8 @@ pendant l'exécution des instructions de la boucle mentionnée précédemment :
 ![Forwarding](img/forwarding.png "Forwarding example")\
 
 On peut voir que l'instruction `sw x13, 0, x14` n'attend pas que l'instruction précédente 
-arrive au stage `WB` pour s'exécuter. On peut déduire du nombre de `stall` que le processeur implémente le forwarding de l'étape `MEM` vers l'étape `EX`. Dans le cas ou le forward était implémeté à l'étape `EX` (juste après le calcul de l'ALU), il n'y aurait eu aucun cycle de 
-`stalling`.
+arrive au stage `WB` pour s'exécuter. On peut déduire du nombre de _stall_ que le processeur implémente le forwarding de l'étape `MEM` vers l'étape `EX`. Dans le 
+cas ou le forward était implémeté à l'étape `EX` (juste après le calcul de l'ALU), il n'y aurait eu aucun cycle de _stalling_.
 
 Dans la partie _Adapting Compiler Explorer generated RISC V assembly code_, on nous donne 
 des indications afin d'adapter un programme traditionnel en un programme compatible avec 
@@ -261,19 +267,35 @@ Voici deux exemples d'instructions qui sont _flush_:
 
 ![Ex1](img/4ex1.png "Flush example")\
 
-On peut voir que les instructions `addi x9 x0 0` et `addi x19 x0 99`  ne sont pas exécutées jusqu'au bout. En effet l'instruction précédente `bne x15 x12 -16` est arrivée au stade d'éxécution. Comme la condition est respectée, le branchement est effectuée. Les deux instructions `addi` sont interrompues et l'instruction cible du saut est initée au cycle suivant
+On peut voir que les instructions `addi x9 x0 0` et `addi x19 x0 99`  ne sont pas exécutées jusqu'au bout. En effet l'instruction précédente `bne x15 x12 -16` est 
+arrivée au stade d'éxécution. Comme la condition est respectée, le branchement est effectuée. Les deux instructions `addi` sont interrompues et l'instruction cible 
+du saut est initée au cycle suivant.
 
 ![Ex2](img/4ex2.png "Flush example")\
 
-Les instructions `addi` et `ecall` sont interrompues avant d'arriver à leur terme car l'instruction `jal` est au stade de l’exécution. Cette instruction permet de passer de l'initialisation du programme au programme en lui même (`<main>`).
+Les instructions `addi` et `ecall` sont interrompues avant d'arriver à leur terme car l'instruction `jal` est au stade de l’exécution. Cette instruction permet de 
+passer de l'initialisation du programme au programme en lui même (`<main>`).
+
+Le processeur **n'implémente pas de prédiction de branche** comme le montre l'image : 
 
 ![NOBP](img/no_bp.png "Pipeline without branch prediction")\
 
-Le processeur **n'implémente pas de prédiction de branche** comme le montre l'image : les deux instructions suivant `bne` sont systématiquement flush. Or, le programme passe dans cette boucle un très grand nombre de fois. Avec une prédiction de branche le processeur aurait pu anticiper le début d'une nouvelle itération de la boucle et donc éviter d'initer les deux instructions suivant la boucle. À la place, il aurait pu commencer les étapes `IF` et `ID` de la nouvelle itération pour gagner du temps et mieux utiliser ses ressources.
+Les deux instructions suivant `bne` sont systématiquement flush. Or, le programme 
+passe dans cette boucle un très grand nombre de fois. Avec une prédiction de branche le processeur aurait pu anticiper le début d'une nouvelle itération de la boucle 
+et donc éviter de commencer le traitement des deux instructions suivant la boucle. À la place, il aurait pu commencer les étapes `IF` et `ID` de la nouvelle itération pour gagner du 
+temps et mieux utiliser ses ressources.
 
-Le CPI idéal de ce genre de processeur (sans parallélisme) **tend vers 1** (il y a quelques cycles sans instructions effectuées au démarrage de l'exécution). On peut voir dans le programme plusieurs moments où le processeur _stall_ l'avancement du programme en attente d'une certaine valeur, en plus des _flush_ évoqués précédemment. Le processeur du cours, quant à lui, implémente une meilleure _forwarding unit_ que le processeur étudié ici. En effet, le processeur du cours permet de _forward_ les données depuis le stage `EX` et `MEM`, tandis qu'ici seul le _forwarding_ depuis `MEM` est supporté. On a donc un cycle de _stalling_ là ou le processeur du cours n'aurait pas eu de _stall_ du tout, ce qui explique la différence de CPI.
+Le CPI idéal de ce genre de processeur (sans parallélisme) **tend vers 1** (il y a quelques cycles sans instructions effectuées au démarrage de l'exécution). On peut 
+voir dans le programme plusieurs moments où le processeur _stall_ l'avancement du programme en attente d'une certaine valeur, en plus des _flush_ évoqués précédemment.\
+Le processeur du cours, quant à lui, implémente une meilleure _forwarding unit_ que le processeur étudié ici. En effet, le processeur du cours permet de _forward_ 
+les données depuis le stage `EX` et `MEM`, tandis qu'ici seul le _forwarding_ depuis `MEM` est supporté. On a donc un cycle de _stalling_ là ou le processeur du cours 
+n'aurait pas eu de _stall_ du tout, ce qui explique la différence de CPI.
 
- 
+Dans le cas optimal, ce processeur peut atteindre un CPI de 0,5. En effet, il peut exécuter en parallèle deux types d'instruction, donc si le programme fourni est 
+adapté, on se rapproche de ce CPI. `insertion-sort.c` est particulièrement inadapté à ce processeur de par l'algorithme même du tri insertion. En effet, chaque étape 
+dépend de la précédente, et la fonction de recherche de minimum n'est pas adaptée non plus. En résulte donc une amélioriation décevante, et ce malgré l'implémentation 
+de la parallélisation.
+
 
 \newpage
 
@@ -372,11 +394,11 @@ Dans la boucle de tri, la fonction `minIndex` est appelée. Cette dernière cont
 
 Notons également que chaque saut ajoute 2 instruction fetches car le processeur, même s'il flush des instructions, les a tout de même cherché dans la mémoire.
 
-On somme tout : 5 + 11 + ((5+2) * 99) + 5 + (98 * (12 + 2 + 13 + 2)) + somme(1, ..., 99) * (6+2) + 8 = 42372 instruction fetches
+On somme tout : `5 + 11 + ((5+2) * 99) + 5 + (98 * (12 + 2 + 13 + 2)) + somme(1, ..., 99) * (6+2) + 8 = 42372 instruction fetches`
 
 Concernant les accès mémoires, on en a 10 à l'empilement/dépilement de `main`, 1 à `_start`, 2 par itération de la boucle de `minIndex` (soit 2 * somme(1, ..., 99) au total, 2 par itération de la boucle de copie au début de `main`, 4 par itération de la boucle de tri.
 
-On somme tout : 11 + 2 * somme(1, ..., 99) + 2 * 99 + 4 * 98 = 601 + 9702 = 10303 data fetches
+On somme tout : `11 + 2 * somme(1, ..., 99) + 2 * 99 + 4 * 98 = 601 + 9702 = 10303 data fetches`
 
 Mais finalement nous n'avons qu'une soixantaine d'instructions : le nombre de fetches résulte des quelques très grandes boucles qui sont effectuées dans le programme. De plus ces adresses sont spatialement contigües : on n'est pas obligé d'aller les chercher en mémoire à chaque fois.
 
@@ -386,15 +408,16 @@ Pour valider nos calculs, nous pouvons prendre des caches à une seule ligne et 
 
 Regardons pour les _data fetches_ :
 
-![data_fetches](img/data_fetches.png)
+![data_fetches](img/data_fetches.png){width=70%}\
 
 Nous avions bien calculé !
 
 Et pour les _instruction fetches_ :
 
-![instr_fetches](img/instr_fetches.png)
+![instr_fetches](img/instr_fetches.png){width=70%}\
 
-On n'est franchement pas loin... Déjà nous avons oublié de compter les 2 instructions cherchées à cause du saut sur `minIndex`. En les ajoutant, on obtient 42568. Les retours provoquent aussi ces 2 instructions, en particulier le retour de la fonction `minIndex` : on ajoute et on obtient 42764.
+On n'est franchement pas loin... Déjà nous avons oublié de compter les 2 instructions cherchées à cause du saut sur `minIndex`. En les ajoutant, on obtient 42568. 
+Les retours provoquent aussi ces 2 instructions, en particulier le retour de la fonction `minIndex` : on ajoute et on obtient 42764.
 
 Pour le reste, les retours de la fonction `main`, les cas particuliers de fin de boucle avec une branche finalement non prise peuvent expliquer notre écart.
 
@@ -402,45 +425,59 @@ Pour le reste, les retours de la fonction `main`, les cas particuliers de fin de
 ### Optimisation du cache
 
 Pour optimiser les accès en mémoire, nous cherchons à tout avoir dans le cache. Commençons par le cache de données.
-Pour ce dernier il faut prévoir deux zones : la section `.data`, de taille `0x190 (400)` octets (100 mots mémoire) et la stack qui sera de `432` octets (108 mots mémoire). Ces deux zones sont amenées à être utilisées simultanément lors de la copie de `input` dans `buffer` : on doit donc prévoir assez de place pour les loger toutes les deux.
+Pour ce dernier il faut prévoir deux zones : la section `.data`, de taille `0x190 (400)` octets (100 mots mémoire) et la stack qui sera de `432` octets (108 mots 
+mémoire). Ces deux zones sont amenées à être utilisées simultanément lors de la copie de `input` dans `buffer` : on doit donc prévoir assez de place pour les loger 
+toutes les deux.
 
-Afin de réduire le nombre de _compulsory misses_, nous prendrons des lignes de très grande capacité : une ligne sera idéalement capable de contenir toute une zone. Cela évite d'avoir dans la boucle de copie par exemple, le chargement d'une nouvelle ligne car on n'avait pas pu tout charger la première fois. Nous envisageons deux lignes de `128 blocks`.
+Afin de réduire le nombre de _compulsory misses_, nous prendrons des lignes de très grande capacité : une ligne sera idéalement capable de contenir toute une zone. 
+Cela évite d'avoir dans la boucle de copie par exemple, le chargement d'une nouvelle ligne car on n'avait pas pu tout charger la première fois. Nous envisageons 
+deux lignes de `128 blocks`.
 
-![cache1](img/cache1.png)
+![cache1](img/cache1.png){height=60%}\
 
-On a énormément de miss. On observe en exécutant pas à pas que le tag de la deuxième change régulièrement entre `0x44` et `0x1fffff` à partir d'un moment dans la copie. Il s'agit de _conflict misses_ : à un certain moment le cache mappe sur la même ligne `input` et `buffer`. Ces derniers étant accédés l'un après l'autre, on perd énormément. Après cela, plus aucun _miss_ : `input` n'est plus utilisé, on n'a besoin que de la stack et tout se passe bien.
+On a énormément de miss. On observe en exécutant pas à pas que le tag de la deuxième change régulièrement entre `0x44` et `0x1fffff` à partir d'un moment dans la 
+copie. Il s'agit de _conflict misses_ : à un certain moment le cache mappe sur la même ligne `input` et `buffer`. Ces derniers étant accédés l'un après l'autre, on 
+perd énormément. Après cela, plus aucun _miss_ : `input` n'est plus utilisé, on n'a besoin que de la stack et tout se passe bien.
 
 On remarque donc également que `.data` ne rentre pas dans une ligne de `128 blocks`.
 
 Réglons d'abord le problème principal, à savoir le _conflict miss_. Pour cela on peut ajouter des lignes.
 
-![cache2](img/cache2.png)
+![cache2](img/cache2.png){height=60%}\
 
 Cela fonctionne mais on peut faire encore mieux : utiliser un _2-way associative cache_ avec une seule ligne :
 
-![cache3](img/cache3.png)
+![cache3](img/cache3.png){height=60%}\
 
-Pour régler le problème du 3ème _miss_, la solution serait soit d'aligner `.data` autrement (mais nous n'avons pas forcément envie de recompiler pour ce projet), soit d'augmenter la taille de la ligne afin que `.data` rentre en une seule fois dans la ligne, ne nous obligeant pas à charger sa deuxième partie durant la copie: 
+Pour régler le problème du 3ème _miss_, la solution serait soit d'aligner `.data` autrement (mais nous n'avons pas forcément envie de recompiler pour ce projet), 
+soit d'augmenter la taille de la ligne afin que `.data` rentre en une seule fois dans la ligne, ne nous obligeant pas à charger sa deuxième partie durant la copie: 
 
-![cache4](img/cache4.png)
+![cache4](img/cache4.png){height=60%}\
 
-On augmente d'un facteur 2 la taille du cache pour résoudre 1 _miss_. Tout dépend de l'application : si on veut réduire la taille ou le coût on préférera garder 3 _misses_, si les performances sont cruciales et que l'on ne peut se permettre d'attendre un accès mémoire, on fera ce sacrifice en taille.
+On augmente d'un facteur 2 la taille du cache pour résoudre 1 _miss_. Tout dépend de l'application : si on veut réduire la taille ou le coût on préférera garder 
+3 _misses_, si les performances sont cruciales et que l'on ne peut se permettre d'attendre un accès mémoire, on fera ce sacrifice en taille.
 
-Concernant la métrique on préférera une métrique, la métrique _random_ ne garantit pas que les _misses_ n'augmenteront pas alors que la métrique _LRU_ le garantit : on préférera cette dernière, quitte à obtenir une implémentation plus coûteuse.
+Concernant la métrique on préférera une métrique, la métrique _random_ ne garantit pas que les _misses_ n'augmenteront pas alors que la métrique _LRU_ le garantit : 
+on préférera cette dernière, quitte à obtenir une implémentation plus coûteuse.
 
 
-Concernant le cache d'instruction, nous avons 65 instructions seulement à stocker (`minIndex` commence en `0x100b8` et `ecall` se trouve en `0x101b8`, menant à 264 mots mémoire. Nous pouvons prévoir une ligne unique de `128 blocks` :
+Concernant le cache d'instruction, nous avons 65 instructions seulement à stocker (`minIndex` commence en `0x100b8` et `ecall` se trouve en `0x101b8`, menant à 264 
+mots mémoire. Nous pouvons prévoir une ligne unique de `128 blocks` :
 
-![cache6](img/cache6.png)
+![cache6](img/cache6.png){height=60%}\
 
 Ici la métrique importe peu, puisqu'un seul fetch sera nécessaire : la taille de la ligne suffit à stocker toutes les instructions.
 
-Notons que dans le cas des données, il nous faut au moins 2 _misses_ : un pour l'accès à `.data` et l'autre pour l'accès à la stack. Les zones mémoire sont trop éloignées pour les charger en même temps sans faire un cache totalement démesuré.
+Notons que dans le cas des données, il nous faut au moins 2 _misses_ : un pour l'accès à `.data` et l'autre pour l'accès à la stack. Les zones mémoire sont trop 
+éloignées pour les charger en même temps sans faire un cache totalement démesuré.
 
 
-Dans ce programme la plupart des données sont accédées via des boucles : on a une proximité temporelle favorable à l'utilisation d'une politique LRU par exemple. De plus, comme on accède à des tableaux, on a également une proximité spatiale. Un cache _direct mapped_ pourrait donc être efficace, même si nous avons décidé ici de réduire au minimum le nombre de _misses_.
+Dans ce programme la plupart des données sont accédées via des boucles : on a une proximité temporelle favorable à l'utilisation d'une politique LRU par exemple. 
+De plus, comme on accède à des tableaux, on a également une proximité spatiale. Un cache _direct mapped_ pourrait donc être efficace, même si nous avons décidé ici 
+de réduire au minimum le nombre de _misses_.
 
 Idem pour les instructions, même si maintenant la question ne se pose plus : nous les avons toutes chargées d'un seul coup.
 
 
-Illustrons les différents types de conflits avec un cache de données _2-way associative_, 2 lignes, _16 blocks_. Nous choisissons volontairement un cache trop petit pour y faire rentrer tout le tableau, afin que nous puissions observer des _capacity misses_. Ces derniers se manifestent alors par des _changements de tag_.
+Illustrons les différents types de conflits avec un cache de données _2-way associative_, 2 lignes, _16 blocks_. Nous choisissons volontairement un cache trop 
+petit pour y faire rentrer tout le tableau, afin que nous puissions observer des _capacity misses_. Ces derniers se manifestent alors par des _changements de tag_.
