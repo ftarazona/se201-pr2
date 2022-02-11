@@ -148,7 +148,7 @@ et non absolues.
 Le code assembleur obtenu n'est pas _position independent_, il fait appel à des instructions utilisant des adresses absolues au lieu d'adresses relatives.
 ???? le dump indique des adresses absolues dans tous les cas, en particulier à la ligne `0x10178`, alors que les instructions utilisent des offsets. Traduction de objdump?
 Dans le cas où c'est bien les adresses absolues qui sont utilisées, ce code n'est pas _position independent_.\
-Dans tous les cas, l'utilisation de `ret` à la fin de la fonction `minIndex` se traduit par l'instruction `jalr x0, x1, 0` et l'adresse dans `x1` n'est aps une adresse relative à la position actuelle (c'est l'adresse de retour enregistrée par l'instruction d'adresse `0x10178`).
+Dans tous les cas, l'utilisation de `ret` à la fin de la fonction `minIndex` se traduit par l'instruction `jalr x0, x1, 0` et l'adresse dans `x1` n'est aps une adresse relative à la position actuelle (c'est l'adresse de retour enregistrée par l'instruction d'adresse `0x10178`).
 
 
 
@@ -257,6 +257,23 @@ end:                                 # <- label de fin de fichier
 
 ## Branches and Multiple-Issue
 
+Voici deux exemples d'instructions qui sont _flush_:
+
+![Ex1](img/4ex1.png "Flush example")\
+
+On peut voir que les instructions `addi x9 x0 0` et `addi x19 x0 99`  ne sont pas exécutées jusqu'au bout. En effet l'instruction précédente `bne x15 x12 -16` est arrivée au stade d'éxécution. Comme la condition est respectée, le branchement est effectuée. Les deux instructions `addi` sont interrompues et l'instruction cible du saut est initée au cycle suivant
+
+![Ex2](img/4ex2.png "Flush example")\
+
+Les instructions `addi` et `ecall` sont interrompues avant d'arriver à leur terme car l'instruction `jal` est au stade de l’exécution. Cette instruction permet de passer de l'initialisation du programme au programme en lui même (`<main>`).
+
+![NOBP](img/no_bp.png "Pipeline without branch prediction")\
+
+Le processeur **n'implémente pas de prédiction de branche** comme le montre l'image : les deux instructions suivant `bne` sont systématiquement flush. Or, le programme passe dans cette boucle un très grand nombre de fois. Avec une prédiction de branche le processeur aurait pu anticiper le début d'une nouvelle itération de la boucle et donc éviter d'initer les deux instructions suivant la boucle. À la place, il aurait pu commencer les étapes `IF` et `ID` de la nouvelle itération pour gagner du temps et mieux utiliser ses ressources.
+
+Le CPI idéal de ce genre de processeur (sans parallélisme) **tend vers 1** (il y a quelques cycles sans instructions effectuées au démarrage de l'exécution). On peut voir dans le programme plusieurs moments où le processeur _stall_ l'avancement du programme en attente d'une certaine valeur, en plus des _flush_ évoqués précédemment. Le processeur du cours, quant à lui, implémente une meilleure _forwarding unit_ que le processeur étudié ici. En effet, le processeur du cours permet de _forward_ les données depuis le stage `EX` et `MEM`, tandis qu'ici seul le _forwarding_ depuis `MEM` est supporté. On a donc un cycle de _stalling_ là ou le processeur du cours n'aurait pas eu de _stall_ du tout, ce qui explique la différence de CPI.
+
+ 
 
 \newpage
 
